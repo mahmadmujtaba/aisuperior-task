@@ -1,0 +1,66 @@
+version: '3'
+
+volumes:
+  vportainer:
+  vmongodb:
+
+networks:
+  default:
+    name: micro-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.1.0/24
+
+services:
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    networks:
+      default:
+    ports:
+      - '9000:9000'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - vportainer:/data
+    restart: always
+
+  mongodb:
+    container_name: mongodb
+    image: bitnami/mongodb:latest
+    env_file:
+      - env_files/mongodb.env
+    networks:
+      default:
+    ports:
+      - '27017:27017'
+    volumes:
+      - vmongodb:/bitnami/mongodb/ 
+    restart: always
+  
+  mongo_express:
+    container_name: mongo_express
+    image: mongo-express:latest
+    env_file:
+      - env_files/mongo-express.env
+    networks:
+      default:
+    ports:
+      - '8081:8081'
+    restart: always
+    depends_on:
+      - mongodb
+
+  nats:
+    container_name: nats
+    image: bitnami/nats:latest
+    env_file:
+      - env_files/nats.env
+    networks:
+      default:
+    ports:
+      - '4222:4222'
+      - '6222:6222'
+      - '8222:8222'
+    restart: always

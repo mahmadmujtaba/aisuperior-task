@@ -1,0 +1,11 @@
+Dear candidate,
+
+you received a jupyter notebook with a code that runs a YOLO model that detects construction debris on images. Your task is to design a web service that would
+- allow user to select an image (or provide a path to it)
+- conduct inference based on the provided model
+- save results to a database
+- design simple APIs to query the results (original image, original image with detections, info on detected objects e.g. amount of objects per class)
+
+We wish you best of luck!
+
+AI Superior Team

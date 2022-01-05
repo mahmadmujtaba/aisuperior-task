@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+starlette<=0.16.0
+pydantic
+pymongo
+httpx
+autopep8
