@@ -27,6 +27,7 @@ def fetch(id):
   
   # get collection cursor.
   items_collection=database['store']
+  print('----------INSIDE', id)
 
   # only return tickets where operations not submitted.
   items = items_collection.find()

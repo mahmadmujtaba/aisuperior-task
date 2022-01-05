@@ -1,9 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks
 from bson import ObjectId
 
-from datetime import datetime
-import httpx
-
 from os import system, path
 from app.database import save, fetch
 
@@ -22,12 +19,11 @@ async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
   file_name = '{}.jpeg'.format(id)
   image.filename = file_name
   contents_before = image.file.read()
-  with open('{}'.format(path.abspath(IMAGE_DIR)), 'wb+') as f:
+  with open('{}/{}'.format(path.abspath(IMAGE_DIR), file_name), 'wb+') as f:
     f.write(contents_before)
   
   # background task.
-  bk.add_task(inference, id, contents_before, file_name, path.abspath(IMAGE_DIR), path.abspath('../../docs/best.pt'))
-  
+  bk.add_task(inference, str(id)  , contents_before, file_name, path.abspath(IMAGE_DIR), path.abspath('../../docs/best.pt'))
   # let client know WIP in progress.
   return {
     'status': '200',
@@ -38,7 +34,10 @@ async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
 
 # inference method.
 def inference(id, contents_before, file_name, source_path, weights_path):
+  print('INSIDE')
   system('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
+  
+  
   
   contents_after, labels_list = None, []
   with open('{}/{}'.format(path.abspath(OUTPUT_DIR)), 'rb+') as f:
@@ -52,6 +51,9 @@ def inference(id, contents_before, file_name, source_path, weights_path):
   
   # save into mongo.
   save(id, contents_before, contents_after, labels)
+  return {
+    'status': 'ok'
+  }
 
 @app.get('/fetch/{id}', tags=['Assessment'])
 async def fetch(id: str) -> dict:
@@ -66,41 +68,4 @@ async def fetch(id: str) -> dict:
   return {
     'id': record['_id'],
     'labels': record['labels']
-  }
-
-
-# get all opened tickets.
-# pass is_closed=True to get all closed tickets too.
-@app.get('/tickets', tags=['Tickets Management'])
-async def list_tickets(is_closed: str) -> list:
-  if is_closed.lower()=='true': return get_tickets(True)
-  return get_tickets(False)
-
-
-@app.post('/tickets', tags=['Tickets Management'])
-async def refresh_tickets() -> dict:
-  response=httpx.get('http://solar_power:5000/')
-  tickets=response.json()['data']
-  global last_sync
-  
-  # for each ticket, add it into mongo database.
-  # filter out data which have started_at greater than last_sync
-  for ticket in tickets:
-    started_at=datetime.fromisoformat(ticket['started_at'])
-    if last_sync is None or started_at > last_sync: insert_ticket(ticket=ticket)
-  
-  # update last_sync to newer time
-  last_sync = datetime.now()
-  return {
-    'error_id': 0,
-    'error_message': 'success'
-  }
-
-# add maintenance operations for given ticket id.
-@app.put('/ticket/{id}', tags=['Tickets Management'])
-async def close_tickets(id: str, operations: Operation) -> dict:
-  update_ticket(id, operations)
-  return {
-    'error_id': 0,
-    'error_message': 'success'
   }
