@@ -15,7 +15,7 @@ def save(id, image, inference_image, labels) -> bool:
   store_collection.insert_one({
     '_id': ObjectId(id),
     'image': image,
-    'inference_image': image,
+    'inference_image': inference_image,
     'labels': labels,
     'timestamp': datetime.now().isoformat()
   })
@@ -23,15 +23,10 @@ def save(id, image, inference_image, labels) -> bool:
 
 
 # return one record from mongodb.
-def fetch(id):
+def fetch_data(id)->dict:
   
   # get collection cursor.
   items_collection=database['store']
-  print('----------INSIDE', id)
 
   # only return tickets where operations not submitted.
-  items = items_collection.find()
-  for item in items:
-    if item['_id'] == ObjectId(id):
-      return item
-  return None
+  return items_collection.find_one(ObjectId(id))

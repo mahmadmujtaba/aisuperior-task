@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, BackgroundTasks
 from bson import ObjectId
 
 from os import system, path
-from app.database import save, fetch
+from app.database import save, fetch_data
 
 IMAGE_DIR='imgs'
 OUTPUT_DIR='output'
@@ -11,7 +11,7 @@ OUTPUT_DIR='output'
 app = FastAPI()
 
 # setting up FastAPI routes.
-@app.post('/upload', tags=['Assessment'])
+@app.post('/upload', tags=['assessment'])
 async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
   
   # new id for incoming record.
@@ -35,18 +35,15 @@ async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
 
 # inference method.
 def inference(id, contents_before, file_name, source_path, weights_path):
-  print('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
   system('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
   
-  contents_after, labels_list = None, []
-  with open('{}/{}'.format(path.abspath(OUTPUT_DIR)), 'rb') as f:
+  contents_after, labels = None, []
+  with open('{}/exp/{}'.format(path.abspath(OUTPUT_DIR), file_name), 'rb') as f:
     contents_after = f.read()
   
   # read labels.
-  with open('{}/exp/{}.txt'.format(path.abspath(OUTPUT_DIR), file_name.split('.')[0]), 'rb+') as f:
-    labels_file = f.read()
-    for labels in labels_file:
-      labels_list.append(labels.split(' '))
+  with open('{}/exp/labels/{}.txt'.format(path.abspath(OUTPUT_DIR), file_name.split('.')[0]), 'rb') as f:
+    labels = str(f.read())
   
   # save into mongo.
   save(id, contents_before, contents_after, labels)
@@ -54,10 +51,10 @@ def inference(id, contents_before, file_name, source_path, weights_path):
     'status': 'ok'
   }
 
-@app.get('/fetch/{resource_od}', tags=['Assessment'])
-async def fetch(resource_od: str) -> dict:
-  record = fetch(resource_od)
-
+@app.get('/fetch/{resource_id}', tags=['assessment'])
+def fetch(resource_id: str) -> dict:
+  record = fetch_data(resource_id)
+  print(record)
   # user found handler.
   if record is None:
     return {
@@ -65,6 +62,6 @@ async def fetch(resource_od: str) -> dict:
       'message': 'Acknowledge. Processing WIP. Check Logs in terminal or stdout.'
     }
   return {
-    'id': record['_id'],
+    'id': str(record['_id']),
     'labels': record['labels']
   }
