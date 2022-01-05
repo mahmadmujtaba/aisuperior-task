@@ -23,8 +23,7 @@ async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
     f.write(contents_before)
   
   # background task.
-  print(path.abspath('../data/best.pt'))
-  bk.add_task(inference, str(id), contents_before, file_name, path.abspath(IMAGE_DIR), path.abspath('../../docs/best.pt'))
+  bk.add_task(inference, str(id), contents_before, file_name, path.abspath(IMAGE_DIR), path.abspath('../docs/best.pt'))
   
   # let client know WIP in progress.
   return {
@@ -36,8 +35,8 @@ async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
 
 # inference method.
 def inference(id, contents_before, file_name, source_path, weights_path):
-  print('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /models/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
-  system('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /models/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
+  print('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
+  system('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
   
   contents_after, labels_list = None, []
   with open('{}/{}'.format(path.abspath(OUTPUT_DIR)), 'rb') as f:
