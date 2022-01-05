@@ -1,5 +1,7 @@
 # Instructions
 
+0. Make sure that on each iteration imgs, output folder are empty.
+
 1. Use docker compose to build our microservice applications.
 ```bash
 docker-compose up -d
