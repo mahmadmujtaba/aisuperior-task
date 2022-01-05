@@ -1,55 +1,71 @@
-from fastapi import Request, FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, File, UploadFile, BackgroundTasks
+from bson import ObjectId
 
 from datetime import datetime
 import httpx
 
-from app.database import verify_login, add_user, get_tickets, insert_ticket, update_ticket
+from os import system, path
+from app.database import save, fetch
 
-class Operation(BaseModel):
-  operations: list
-
-# base template for user.
-class User(BaseModel):
-  username: str
-  password: str
+IMAGE_DIR='imgs'
+OUTPUT_DIR='output'
 
 # app initiated.
 app = FastAPI()
 
-# sync only data which has started_at in tickets greater than last_sync
-last_sync = None
-
 # setting up FastAPI routes.
-@app.post('/login', tags=['User'])
-async def login(user: User) -> dict:
-  user_found = verify_login(user.username, user.password)
-
-  # user found handler.
-  if user_found is True:
-      return {
-        'error_id': 0,
-        'error_message': 'success'
-      }
+@app.post('/upload', tags=['Assessment'])
+async def upload(bk: BackgroundTasks, image: UploadFile = File(...)) -> dict:
+  
+  # new id for incoming record.
+  id = ObjectId()
+  file_name = '{}.jpeg'.format(id)
+  image.filename = file_name
+  contents_before = image.file.read()
+  with open('{}'.format(path.abspath(IMAGE_DIR)), 'wb+') as f:
+    f.write(contents_before)
+  
+  # background task.
+  bk.add_task(inference, id, contents_before, file_name, path.abspath(IMAGE_DIR), path.abspath('../../docs/best.pt'))
+  
+  # let client know WIP in progress.
   return {
-    'error_id': 404,
-    'error_message': 'user not found'
+    'status': '200',
+    'resource_id': id,
+    'message': 'WIP. Use FetchById to check completition status.'
   }
 
 
-@app.post('/register', tags=['User'])
-async def register(user: User) -> dict:
-  user_added = add_user(user.username, user.password)
+# inference method.
+def inference(id, contents_before, file_name, source_path, weights_path):
+  system('docker run --rm --ipc=host -v {}:/data/best.pt:rw -v {}:/data/imgs:rw -v {}:/usr/src/app/runs/detect:rw  ultralytics/yolov5:latest python detect.py --weights /data/best.pt --img 4000 --conf 0.25 --source /data/imgs --save-txt --hide-label'.format(weights_path, source_path, path.abspath(OUTPUT_DIR)))
+  
+  contents_after, labels_list = None, []
+  with open('{}/{}'.format(path.abspath(OUTPUT_DIR)), 'rb+') as f:
+    contents_after = f.read()
+  
+  # read labels.
+  with open('{}/exp/{}.txt'.format(path.abspath(OUTPUT_DIR), file_name.split('.')[0]), 'rb+') as f:
+    labels_file = f.read()
+    for labels in labels_file:
+      labels_list.append(labels.split(' '))
+  
+  # save into mongo.
+  save(id, contents_before, contents_after, labels)
+
+@app.get('/fetch/{id}', tags=['Assessment'])
+async def fetch(id: str) -> dict:
+  record = fetch(id)
 
   # user found handler.
-  if user_added is True:
+  if record is None:
     return {
-      'error_id': 0,
-      'error_message': 'success'
+      'status': 301,
+      'message': 'Acknowledge. Processing WIP. Check Logs in terminal or stdout.'
     }
   return {
-    'error_id': 400,
-    'error_message': 'user not added'
+    'id': record['_id'],
+    'labels': record['labels']
   }
 
 

@@ -5,3 +5,4 @@ pydantic
 pymongo
 httpx
 autopep8
+fastapi-mul
